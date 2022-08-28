@@ -1,5 +1,5 @@
 [package]
-name = "json_pl"
+name = "jsonpl"
 version = "0.1.0"
 edition = "2021"
 

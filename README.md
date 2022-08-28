@@ -1,4 +1,4 @@
-# json_pl
+# jsonpl
  The JSON Programming Language
 
 Transforms JSON to JSON.
