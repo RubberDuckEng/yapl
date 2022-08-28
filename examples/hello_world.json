@@ -1,0 +1,26 @@
+[
+    {
+        "op": "if",
+        "condition": {
+            "op": "==",
+            "args": {
+                "left": {
+                    "op": "get_lang"
+                },
+                "right": "en"
+            }
+        },
+        "then": {
+            "op": "print",
+            "args": {
+                "msg": "Hello World"
+            }
+        },
+        "else": {
+            "op": "print",
+            "args": {
+                "msg": "Bonjour le monde"
+            }
+        }
+    }
+]
