@@ -2,12 +2,19 @@ use rustyline;
 
 mod vm;
 
+fn read_eval_print(env: &vm::Environment, input: &str) -> Result<String, vm::Error> {
+    let value = vm::parse(input)?;
+    let value = vm::eval(env, &value)?;
+    vm::serialize(&value)
+}
+
 fn main() -> rustyline::Result<()> {
     let mut rl = rustyline::Editor::<()>::new()?;
+    let env = vm::Environment::builtin();
     loop {
         let readline = rl.readline(">> ");
         match readline {
-            Ok(line) => match vm::parse(&line).and_then(|value| vm::serialize(&value)) {
+            Ok(line) => match read_eval_print(&env, &line) {
                 Ok(json) => println!("{}", json),
                 Err(err) => println!("Error: {:?}", err),
             },
