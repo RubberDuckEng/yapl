@@ -190,8 +190,11 @@ impl Environment {
             parent: None,
         };
         env.bind_native_function("println", builtins::println);
+        env.bind_native_function("deserialize", builtins::deserialize);
+        env.bind_native_function("serialize", builtins::serialize);
         env.bind_native_special_form("lambda", builtins::lambda);
         env.bind_native_special_form("lookup", builtins::lookup);
+        env.bind_native_special_form("quote", builtins::quote);
         Arc::new(env)
     }
 
