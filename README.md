@@ -23,3 +23,17 @@ $ cargo run --bin interp examples/hello_world.json
 * JSON scheme validator
 * Library for string manipulation
 * Library for doing math
+
+# Similar projects
+* [https://stackoverflow.com/questions/1618038/xslt-equivalent-for-json]
+
+# Constructs that should be expressible
+
+* List and object comprehensions
+  - `[for (<expr>) <expr>]`
+  - `{for (<expr>) <expr> : <expr>}`
+* Source of stdlib ideas
+  - [https://github.com/chrisdone/jl#available-functions]
+* Pathing syntax
+  - [https://goessner.net/articles/JsonPath/]
+  - [https://github.com/dfilatov/jspath]
