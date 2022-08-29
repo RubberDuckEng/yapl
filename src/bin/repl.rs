@@ -2,8 +2,9 @@ extern crate jsonpl;
 
 use jsonpl::vm;
 use rustyline;
+use std::sync::Arc;
 
-fn read_eval_print(env: &vm::Environment, input: &str) -> Result<String, vm::Error> {
+fn read_eval_print(env: &Arc<vm::Environment>, input: &str) -> Result<String, vm::Error> {
     let value = vm::parse(input)?;
     let value = vm::eval(env, &value)?;
     vm::serialize(&value)
