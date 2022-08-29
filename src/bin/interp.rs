@@ -13,7 +13,7 @@ fn main() -> Result<(), std::io::Error> {
         exit(1);
     }
     let input = fs::read_to_string(&args[1])?;
-    match vm::parse(&input).and_then(|value| vm::eval(&env, value)) {
+    match vm::parse(&input).and_then(|value| vm::eval(&env, &value)) {
         Ok(_) => Ok(()),
         Err(err) => {
             eprintln!("Error: {:?}", err);
