@@ -1,10 +1,11 @@
-use rustyline;
+extern crate jsonpl;
 
-mod vm;
+use jsonpl::vm;
+use rustyline;
 
 fn read_eval_print(env: &vm::Environment, input: &str) -> Result<String, vm::Error> {
     let value = vm::parse(input)?;
-    let value = vm::eval(env, &value)?;
+    let value = vm::eval(env, value)?;
     vm::serialize(&value)
 }
 

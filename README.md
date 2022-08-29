@@ -3,6 +3,12 @@
 
 Transforms JSON to JSON.
 
+# How to run
+
+```sh
+$ cargo run --bin interp examples/hello_world.json
+```
+
 # Things to try
 * Immutable?
 * No classes

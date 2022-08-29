@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use serde_json;
 
 mod builtins;
@@ -5,8 +6,11 @@ mod builtins;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     EvalError,
-    ParseError,
-    SerializeationError,
+    Parse,
+    Serializeation,
+    MissingOperation,
+    TypeError,
+    UnknownVariable(String),
 }
 
 pub type Map<K, V> = std::collections::HashMap<K, V>;
@@ -22,6 +26,15 @@ pub enum Value {
     Array(Vec<Value>),
     Object(Map<String, Value>),
     Function(Function),
+}
+
+impl Value {
+    pub fn empty_map() -> &'static Self {
+        lazy_static! {
+            static ref EMPTY: Value = Value::Object(Map::new());
+        }
+        &EMPTY
+    }
 }
 
 #[derive(Clone)]
@@ -48,6 +61,18 @@ impl std::cmp::Eq for FunctionBody {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
     body: FunctionBody,
+}
+
+impl Function {
+    pub fn call(&self, args: &Value) -> Result<Value, Error> {
+        if let Value::Object(args) = args {
+            match &self.body {
+                FunctionBody::Native(native) => native(args),
+            }
+        } else {
+            Err(Error::TypeError)
+        }
+    }
 }
 
 impl From<serde_json::Value> for Value {
@@ -86,14 +111,14 @@ impl From<Value> for serde_json::Value {
 }
 
 pub fn parse(json: &str) -> Result<Value, Error> {
-    let value: serde_json::Value = serde_json::from_str(json).map_err(|_| Error::ParseError)?;
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|_| Error::Parse)?;
     Ok(value.into())
 }
 
 pub fn serialize(value: &Value) -> Result<String, Error> {
     // TODO: Avoid cloning the entire value just to serialize it.
     let value: serde_json::Value = value.clone().into();
-    serde_json::to_string(&value).map_err(|_| Error::SerializeationError)
+    serde_json::to_string(&value).map_err(|_| Error::Serializeation)
 }
 
 pub struct Environment {
@@ -109,6 +134,12 @@ impl Environment {
         env
     }
 
+    pub fn lookup(&self, name: &str) -> Result<&Value, Error> {
+        self.variables
+            .get(name)
+            .ok_or(Error::UnknownVariable(name.to_string()))
+    }
+
     pub fn bind_native(&mut self, name: &str, function: NativeFunction) {
         self.variables.insert(
             name.to_string(),
@@ -119,6 +150,37 @@ impl Environment {
     }
 }
 
-pub fn eval(_env: &Environment, _value: &Value) -> Result<Value, Error> {
-    Err(Error::EvalError)
+fn as_string(value: &Value) -> Result<&str, Error> {
+    match value {
+        Value::String(value) => Ok(value),
+        _ => Err(Error::TypeError),
+    }
+}
+
+fn as_func(value: &Value) -> Result<&Function, Error> {
+    match value {
+        Value::Function(value) => Ok(value),
+        _ => Err(Error::TypeError),
+    }
+}
+
+pub fn eval(env: &Environment, value: Value) -> Result<Value, Error> {
+    Ok(match value {
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Function(_) => {
+            value
+        }
+        Value::Array(values) => Value::Array(
+            values
+                .into_iter()
+                .map(|value| eval(env, value))
+                .collect::<Result<Vec<Value>, Error>>()?,
+        ),
+        Value::Object(object) => {
+            let op = object.get("op").ok_or(Error::MissingOperation)?;
+            let func = as_func(env.lookup(as_string(op)?)?)?;
+            let empty_map = Value::empty_map();
+            let args = object.get("args").unwrap_or(empty_map);
+            func.call(args)?
+        }
+    })
 }
