@@ -1,0 +1,16 @@
+{
+    "op": "println",
+    "args": {
+        "msg": {
+            "op": "serialize",
+            "args": {
+                "value": {
+                    "op": "quote",
+                    "object": {
+                        "abitrary": 1
+                    }
+                }
+            }
+        }
+    }
+}
