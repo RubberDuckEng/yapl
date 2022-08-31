@@ -90,10 +90,7 @@ pub fn nonrecursive_let(
             Ok((name.clone(), value))
         })
         .collect::<Result<Object, Error>>()?;
-    let child_env = Arc::new(Environment {
-        variables: variables,
-        parent: Some(env.clone()),
-    });
+    let child_env = Environment::new(variables, Some(env.clone()));
     eval(&child_env, get_key(object, "+in")?)
 }
 
@@ -125,10 +122,7 @@ pub fn import(
             _ => return Err(Error::new_type("import mapping (string or null)", &exports)),
         };
     }
-    let child_env = Arc::new(Environment {
-        variables: variables,
-        parent: Some(env.clone()),
-    });
+    let child_env = Environment::new(variables, Some(env.clone()));
     eval(&child_env, get_key(object, "+in")?)
 }
 

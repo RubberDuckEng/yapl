@@ -139,6 +139,18 @@ pub struct Function {
 }
 
 impl Function {
+    fn eval_args(&self, env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+        match &self.body {
+            FunctionBody::Native(_) => {
+                // TODO: This isn't quite right. We need to be able to know whether
+                // the native function takes an object, an array, or a singleton value.
+                eval(env, args)
+            }
+            FunctionBody::Lambda(lambda) => lambda.eval_args(env, args),
+            FunctionBody::NativeSpecialForm(_) => Ok(args.clone()),
+        }
+    }
+
     pub fn call(
         &self,
         env: &Arc<Environment>,
@@ -146,13 +158,8 @@ impl Function {
         args: &Arc<Value>,
     ) -> Result<Arc<Value>, Error> {
         match &self.body {
-            FunctionBody::Native(native) => {
-                // TODO: This isn't quite right. We need to be able to know whether
-                // the native function takes an object, an array, or a singleton value.
-                let evalated_args = eval(env, args)?;
-                native(env, &evalated_args)
-            }
-            FunctionBody::Lambda(lambda) => lambda.call(env, args),
+            FunctionBody::Native(native) => native(env, args),
+            FunctionBody::Lambda(lambda) => lambda.call(args),
             FunctionBody::NativeSpecialForm(special_form) => special_form(env, object, args),
         }
     }
@@ -236,6 +243,10 @@ impl Environment {
         Arc::new(env)
     }
 
+    pub fn new(variables: Object, parent: Option<Arc<Environment>>) -> Arc<Environment> {
+        Arc::new(Environment { variables, parent })
+    }
+
     pub fn lookup(&self, name: &str) -> Result<&Arc<Value>, Error> {
         if let Some(value) = self.variables.get(name) {
             Ok(value)
@@ -285,16 +296,28 @@ struct Lambda {
 }
 
 impl Lambda {
-    pub fn call(&self, env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+    fn eval_args(&self, env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+        Ok(match &self.formals {
+            Formals::Singleton(_) => eval(env, args)?,
+            Formals::Positional(_) => {
+                let array = Value::as_array(args)?;
+                Arc::new(Value::Array(eval_array(env, &array)?))
+            }
+            Formals::Named(_) => {
+                let object = Value::as_object(args)?;
+                Arc::new(Value::Object(eval_object(env, object)?))
+            }
+        })
+    }
+
+    fn call(&self, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
         let mut variables = Map::new();
         match &self.formals {
             Formals::Singleton(name) => {
-                let evalated_args = eval(env, args)?;
-                variables.insert(name.clone(), evalated_args);
+                variables.insert(name.clone(), args.clone());
             }
             Formals::Positional(names) => {
                 let values = Value::as_array(args)?;
-                let values = eval_array(env, values)?;
                 if names.len() != values.len() {
                     return Err(Error::ArgumentCountMismatch(names.len(), values.len()));
                 }
@@ -304,7 +327,6 @@ impl Lambda {
             }
             Formals::Named(names) => {
                 let values = Value::as_object(args)?;
-                let values = eval_object(env, values)?;
                 for name in names.iter() {
                     let actual = values
                         .get(name)
@@ -314,10 +336,7 @@ impl Lambda {
                 }
             }
         };
-        let env = Arc::new(Environment {
-            variables,
-            parent: Some(self.env.clone()),
-        });
+        let env = Environment::new(variables, Some(self.env.clone()));
         eval(&env, &self.body)
     }
 }
@@ -350,17 +369,17 @@ pub fn eval(env: &Arc<Environment>, value: &Arc<Value>) -> Result<Arc<Value>, Er
         Value::Array(values) => Arc::new(Value::Array(eval_array(env, values)?)),
         Value::Object(object) => {
             let op = get_op(object)?;
-            let func = env.lookup(&op.name)?.clone();
-            Value::as_function(&func)?.call(env, object, &op.args)?
+            let func = Value::as_function(env.lookup(&op.name)?)?;
+            let args = func.eval_args(env, &op.args)?;
+            func.call(env, object, &args)?
         }
     })
 }
 
 pub fn get_key<'a>(object: &'a Object, key: &str) -> Result<&'a Arc<Value>, Error> {
-    object.get(key).ok_or_else(|| {
-        // let me break here
-        Error::UnknownKey(key.to_string())
-    })
+    object
+        .get(key)
+        .ok_or_else(|| Error::UnknownKey(key.to_string()))
 }
 
 pub fn get_index(array: &Vec<Arc<Value>>, index: usize) -> Result<&Arc<Value>, Error> {

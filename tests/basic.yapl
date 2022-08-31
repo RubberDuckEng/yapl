@@ -7,12 +7,12 @@ import:
     quote:
       - in: hello
         out: hello
-      # - in:
-      #     quote: { arbitrary: 1 }
-      #   out: { arbitrary: 1 }
-      # - in:
-      #     deserialize: '{ "banana": "fruit" }'
-      #   out: { banana: fruit }
+      - in:
+          quote: { arbitrary: 1 }
+        out: { arbitrary: 1 }
+      - in:
+          deserialize: '{ "banana": "fruit" }'
+        out: { banana: fruit }
       # - in:
       #     +: [1, 1]
       #   out: 2
