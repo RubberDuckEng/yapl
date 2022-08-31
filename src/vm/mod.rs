@@ -18,6 +18,7 @@ pub enum Error {
     InvalidIndex(usize, usize),
     ArgumentCountMismatch(usize, usize),
     MissingNamedArgument(String),
+    InvalidNumber(Number),
     IO,
 }
 
@@ -80,6 +81,18 @@ impl Value {
             Value::Bool(value) => Ok(*value),
             _ => Err(Error::new_type("bool", value)),
         }
+    }
+
+    pub fn as_number(value: &Arc<Value>) -> Result<Number, Error> {
+        match value.as_ref() {
+            Value::Number(value) => Ok(value.clone()),
+            _ => Err(Error::new_type("number", value)),
+        }
+    }
+
+    pub fn as_f64(value: &Arc<Value>) -> Result<f64, Error> {
+        let n = Self::as_number(value)?;
+        n.as_f64().ok_or_else(|| Error::InvalidNumber(n))
     }
 
     pub fn as_string(value: &Arc<Value>) -> Result<&str, Error> {
@@ -233,6 +246,7 @@ impl Environment {
         env.bind_native_function("println", builtins::println);
         env.bind_native_function("serialize", builtins::serialize);
         env.bind_native_function("eq", builtins::eq);
+        env.bind_native_function("+", builtins::plus);
         env.bind_native_special_form("$", builtins::lookup);
         env.bind_native_special_form("export", builtins::export);
         env.bind_native_special_form("import", builtins::import);

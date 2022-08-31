@@ -13,6 +13,6 @@ import:
       - in:
           deserialize: '{ "banana": "fruit" }'
         out: { banana: fruit }
-      # - in:
-      #     +: [1, 1]
-      #   out: 2
+      - in:
+          +: [1, 1]
+        out: 2.0

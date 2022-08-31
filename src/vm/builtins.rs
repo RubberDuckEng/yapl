@@ -166,3 +166,12 @@ pub fn eq(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Erro
     let rhs = get_index(args, 1)?;
     Ok(Arc::new(Value::Bool(lhs == rhs)))
 }
+
+pub fn plus(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+    let args = Value::as_array(args)?;
+    let lhs = Value::as_f64(get_index(args, 0)?)?;
+    let rhs = Value::as_f64(get_index(args, 1)?)?;
+    Ok(Arc::new(Value::Number(
+        Number::from_f64(lhs + rhs).unwrap(),
+    )))
+}
