@@ -1,0 +1,8 @@
+let:
+  greeting:
+    lambda: [subject]
+    in:
+      - println: "hello, "
+      - println: { $: subject }
+in:
+  greeting: world
