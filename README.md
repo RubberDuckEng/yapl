@@ -25,6 +25,7 @@ $ cargo run --bin interp examples/hello_world.json
 * Library for doing math
 
 # Similar projects
+* [https://github.com/scravy/jinsi]
 * [https://stackoverflow.com/questions/1618038/xslt-equivalent-for-json]
 
 # Constructs that should be expressible
