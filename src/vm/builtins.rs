@@ -35,7 +35,7 @@ fn get_formals(args: &Arc<Value>) -> Result<Formals, Error> {
             names.keys().map(|name| name.clone()).collect(),
         )),
 
-        _ => Err(Error::new_type_error(
+        _ => Err(Error::new_type(
             "Formal parameters (string, array, or object)",
             args,
         )),
@@ -109,7 +109,7 @@ pub fn import(
     for (name, value) in modules.iter() {
         let path_name = format!("{}.yapl", name);
         let path = file_dir.join(path_name);
-        let program = fs::read_to_string(&path).map_err(|_| Error::IOError)?;
+        let program = fs::read_to_string(&path).map_err(|_| Error::IO)?;
         let parsed_program = parse(&program)?;
         let root_env = Environment::builtin(path.display().to_string());
         let exports = eval(&root_env, &parsed_program)?;
@@ -122,12 +122,7 @@ pub fn import(
                     variables.insert(name.clone(), value.clone());
                 }
             }
-            _ => {
-                return Err(Error::new_type_error(
-                    "import mapping (string or null)",
-                    &exports,
-                ))
-            }
+            _ => return Err(Error::new_type("import mapping (string or null)", &exports)),
         };
     }
     let child_env = Arc::new(Environment {

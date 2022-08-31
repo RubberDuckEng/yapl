@@ -7,24 +7,23 @@ mod builtins;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    EvalError,
     Parse,
     Serializeation,
     MissingOperation,
     AmbiguousOperation(Vec<Op>),
-    TypeError(String),
+    Type(String),
     InvalidOperation,
     UndefinedSymbol(String),
     UnknownKey(String),
     InvalidIndex(usize, usize),
     ArgumentCountMismatch(usize, usize),
     MissingNamedArgument(String),
-    IOError,
+    IO,
 }
 
 impl Error {
-    fn new_type_error(expected: &str, actual: &Arc<Value>) -> Error {
-        Error::TypeError(format!("Expected {}, got {}", expected, actual.type_of()))
+    fn new_type(expected: &str, actual: &Arc<Value>) -> Error {
+        Error::Type(format!("Expected {}, got {}", expected, actual.type_of()))
     }
 }
 
@@ -79,35 +78,35 @@ impl Value {
     pub fn as_bool(value: &Arc<Value>) -> Result<bool, Error> {
         match value.as_ref() {
             Value::Bool(value) => Ok(*value),
-            _ => Err(Error::new_type_error("bool", value)),
+            _ => Err(Error::new_type("bool", value)),
         }
     }
 
     pub fn as_string(value: &Arc<Value>) -> Result<&str, Error> {
         match value.as_ref() {
             Value::String(value) => Ok(value),
-            _ => Err(Error::new_type_error("string", value)),
+            _ => Err(Error::new_type("string", value)),
         }
     }
 
     pub fn as_function(value: &Arc<Value>) -> Result<&Function, Error> {
         match value.as_ref() {
             Value::Function(value) => Ok(value),
-            _ => Err(Error::new_type_error("function", value)),
+            _ => Err(Error::new_type("function", value)),
         }
     }
 
     pub fn as_object(value: &Arc<Value>) -> Result<&Object, Error> {
         match value.as_ref() {
             Value::Object(value) => Ok(value),
-            _ => Err(Error::new_type_error("object", value)),
+            _ => Err(Error::new_type("object", value)),
         }
     }
 
     pub fn as_array(value: &Arc<Value>) -> Result<&Vec<Arc<Value>>, Error> {
         match value.as_ref() {
             Value::Array(values) => Ok(values),
-            _ => Err(Error::new_type_error("array", value)),
+            _ => Err(Error::new_type("array", value)),
         }
     }
 }
