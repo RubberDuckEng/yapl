@@ -1,31 +1,31 @@
-let:
-  test:
-    lambda: { in, out }
+export:
+  tests:
+    lambda: cases
     +in:
       let:
-        actual:
-          eval: { $: in }
-      +in:
-        if:
-          eq:
-            - { $: actual }
-            - { $: out }
-        +then:
-          println: PASS
-        +else:
-          - print: "FAIL: "
-          - print:
-              serialize: { $: in }
-          - print: " was "
-          - print:
-              serialize: { $: actual }
-          - print: " (expected: "
-          - print:
-              serialize: { $: out }
-          - println: ")"
-+in:
-  export:
-    tests:
-      lambda: cases
+        test:
+          lambda: { in, out }
+          +in:
+            let:
+              actual:
+                eval: { $: in }
+            +in:
+              if:
+                eq:
+                  - { $: actual }
+                  - { $: out }
+              +then:
+                println: PASS
+              +else:
+                - print: "FAIL: "
+                - print:
+                    serialize: { $: in }
+                - print: " was "
+                - print:
+                    serialize: { $: actual }
+                - print: " (expected: "
+                - print:
+                    serialize: { $: out }
+                - println: ")"
       +in:
         map: [{ $: test }, { $: cases }]
