@@ -1,2 +1,2 @@
-#!target/debug/interp
+#!/usr/bin/env cargo run --bin interp
 println: "hello, world"

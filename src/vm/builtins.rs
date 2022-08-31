@@ -2,17 +2,17 @@ use super::*;
 use std::fs;
 use std::path::Path;
 
-pub fn println(args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+pub fn println(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
     println!("{}", Value::as_string(args)?);
     Ok(Value::null())
 }
 
-pub fn deserialize(args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+pub fn deserialize(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
     let string = Value::as_string(&args)?;
     Ok(parse(&string)?)
 }
 
-pub fn serialize(args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+pub fn serialize(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
     Ok(Arc::new(Value::String(super::serialize(args)?)))
 }
 
@@ -29,7 +29,11 @@ fn get_formals(args: &Arc<Value>) -> Result<Formals, Error> {
         Value::Object(names) => Ok(Formals::Named(
             names.keys().map(|name| name.clone()).collect(),
         )),
-        _ => Err(Error::TypeError),
+
+        _ => Err(Error::new_type_error(
+            "Formal parameters (string, array, or object)",
+            args,
+        )),
     }
 }
 
@@ -97,14 +101,14 @@ pub fn import(
     let modules = Value::as_object(args)?;
     let file_path = Path::new(Value::as_string(env.lookup(FILE_SYMBOL)?)?);
     let file_dir = file_path.parent().unwrap();
-    for (name, _value) in modules.iter() {
+    for (name, value) in modules.iter() {
         let path_name = format!("{}.yapl", name);
         let path = file_dir.join(path_name);
         let program = fs::read_to_string(&path).map_err(|_| Error::IOError)?;
         let parsed_program = parse(&program)?;
         let root_env = Environment::builtin(path.display().to_string());
         let exports = eval(&root_env, &parsed_program)?;
-        match exports.as_ref() {
+        match value.as_ref() {
             Value::String(name) => {
                 variables.insert(name.clone(), exports);
             }
@@ -113,7 +117,12 @@ pub fn import(
                     variables.insert(name.clone(), value.clone());
                 }
             }
-            _ => return Err(Error::TypeError),
+            _ => {
+                return Err(Error::new_type_error(
+                    "import mapping (string or null)",
+                    &exports,
+                ))
+            }
         };
     }
     let child_env = Arc::new(Environment {
@@ -121,4 +130,25 @@ pub fn import(
         parent: Some(env.clone()),
     });
     eval(&child_env, get_key(object, "+in")?)
+}
+
+pub fn export(
+    env: &Arc<Environment>,
+    _object: &Object,
+    args: &Arc<Value>,
+) -> Result<Arc<Value>, Error> {
+    let object = Value::as_object(args)?;
+    Ok(Arc::new(Value::Object(eval_object(env, object)?)))
+}
+
+pub fn map(env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+    let args = Value::as_array(args)?;
+    let func = Value::as_function(get_index(args, 0)?)?;
+    let array = Value::as_array(get_index(args, 1)?)?;
+
+    let results = array
+        .iter()
+        .map(|value| func.call(env, &Object::new(), value))
+        .collect::<Result<Vec<Arc<Value>>, Error>>()?;
+    Ok(Arc::new(Value::Array(results)))
 }

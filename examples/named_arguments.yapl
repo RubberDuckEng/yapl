@@ -1,9 +1,9 @@
 #!/usr/bin/env cargo run --bin interp
 let:
   greeting:
-    lambda: subject
+    lambda: { subject, predicate }
     +in:
       - println: "hello, "
       - println: { $: subject }
 +in:
-  greeting: world
+  greeting: { subject: world, predicate: banana }

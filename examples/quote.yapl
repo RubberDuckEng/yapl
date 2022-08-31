@@ -1,4 +1,4 @@
-#!target/debug/interp
+#!/usr/bin/env cargo run --bin interp
 println:
   serialize:
     quote: { abitrary: 1 }
