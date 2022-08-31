@@ -7,6 +7,11 @@ pub fn println(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>,
     Ok(Value::null())
 }
 
+pub fn print(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+    print!("{}", Value::as_string(args)?);
+    Ok(Value::null())
+}
+
 pub fn deserialize(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
     let string = Value::as_string(&args)?;
     Ok(parse(&string)?)
@@ -151,4 +156,24 @@ pub fn map(env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Erro
         .map(|value| func.call(env, &Object::new(), value))
         .collect::<Result<Vec<Arc<Value>>, Error>>()?;
     Ok(Arc::new(Value::Array(results)))
+}
+
+pub fn if_func(
+    env: &Arc<Environment>,
+    object: &Object,
+    args: &Arc<Value>,
+) -> Result<Arc<Value>, Error> {
+    let condition = Value::as_bool(&eval(env, args)?)?;
+    if condition {
+        eval(env, get_key(object, "+then")?)
+    } else {
+        eval(env, get_key(object, "+else")?)
+    }
+}
+
+pub fn eq(_env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+    let args = Value::as_array(args)?;
+    let lhs = get_index(args, 0)?;
+    let rhs = get_index(args, 1)?;
+    Ok(Arc::new(Value::Bool(lhs == rhs)))
 }

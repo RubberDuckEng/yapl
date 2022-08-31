@@ -76,6 +76,13 @@ impl Value {
         EMPTY.clone()
     }
 
+    pub fn as_bool(value: &Arc<Value>) -> Result<bool, Error> {
+        match value.as_ref() {
+            Value::Bool(value) => Ok(*value),
+            _ => Err(Error::new_type_error("bool", value)),
+        }
+    }
+
     pub fn as_string(value: &Arc<Value>) -> Result<&str, Error> {
         match value.as_ref() {
             Value::String(value) => Ok(value),
@@ -214,15 +221,19 @@ impl Environment {
         };
         env.bind_string(FILE_SYMBOL, path);
         env.bind_native_function("deserialize", builtins::deserialize);
+        env.bind_native_function("eval", eval);
         env.bind_native_function("map", builtins::map);
+        env.bind_native_function("print", builtins::print);
         env.bind_native_function("println", builtins::println);
         env.bind_native_function("serialize", builtins::serialize);
+        env.bind_native_function("eq", builtins::eq);
         env.bind_native_special_form("$", builtins::lookup);
         env.bind_native_special_form("export", builtins::export);
         env.bind_native_special_form("import", builtins::import);
         env.bind_native_special_form("lambda", builtins::lambda);
         env.bind_native_special_form("let", builtins::nonrecursive_let);
         env.bind_native_special_form("quote", builtins::quote);
+        env.bind_native_special_form("if", builtins::if_func);
         Arc::new(env)
     }
 
