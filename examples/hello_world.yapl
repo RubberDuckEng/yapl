@@ -1,1 +1,2 @@
+#!target/debug/interp
 println: "hello, world"

@@ -1,8 +1,8 @@
-let:
-  greeting:
-    lambda: [subject]
-    in:
-      - println: "hello, "
-      - println: { $: subject }
-in:
-  greeting: world
+#!target/debug/interp
+- let:
+    greeting:
+      lambda: subject
+      +in:
+        - println: "hello, "
+        - println: { $: subject }
+- greeting: world

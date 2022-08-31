@@ -1,11 +1,12 @@
 extern crate jsonpl;
 
+use anyhow::Result;
 use jsonpl::vm;
 use std::env;
 use std::fs;
 use std::process::exit;
 
-fn main() -> Result<(), std::io::Error> {
+fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         println!("Usage: {} <file>", args[0]);

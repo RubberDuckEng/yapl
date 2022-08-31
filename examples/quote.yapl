@@ -1,3 +1,4 @@
+#!target/debug/interp
 println:
   serialize:
     quote: { abitrary: 1 }

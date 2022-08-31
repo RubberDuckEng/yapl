@@ -21,14 +21,14 @@ fn main() -> rustyline::Result<()> {
                 Err(err) => println!("Error: {:?}", err),
             },
             Err(rustyline::error::ReadlineError::Interrupted) => {
-                println!("CTRL-C");
+                eprintln!("CTRL-C");
                 break;
             }
             Err(rustyline::error::ReadlineError::Eof) => {
-                println!("CTRL-D");
+                eprintln!("CTRL-D");
                 break;
             }
-            Err(err) => println!("Error: {:?}", err),
+            Err(err) => eprintln!("Error: {:?}", err),
         }
     }
     Ok(())

@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use serde_json;
+use serde_yaml;
 use std::sync::Arc;
 
 mod builtins;
@@ -10,17 +11,20 @@ pub enum Error {
     Parse,
     Serializeation,
     MissingOperation,
+    AmbiguousOperation,
     TypeError,
     InvalidOperation,
     UndefinedVariable(String),
     UnknownKey(String),
+    ArgumentCountMismatch(usize, usize),
 }
 
 pub type Object = Map<String, Arc<Value>>;
 pub type Map<K, V> = std::collections::HashMap<K, V>;
 pub type Number = serde_json::Number;
-pub type NativeFunction = fn(&Object) -> Result<Arc<Value>, Error>;
-pub type NativeSpecialForm = fn(&Arc<Environment>, &Object) -> Result<Arc<Value>, Error>;
+pub type NativeFunction = fn(&Arc<Value>) -> Result<Arc<Value>, Error>;
+pub type NativeSpecialForm =
+    fn(&Arc<Environment>, &Object, &Arc<Value>) -> Result<Arc<Value>, Error>;
 
 // TODO: Use a smarter handle than Arc to store null, bool, number, and string
 // without needing a heap allocation.
@@ -108,25 +112,22 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn call(&self, env: &Arc<Environment>, object: &Object) -> Result<Arc<Value>, Error> {
-        let get_args = || {
-            let empty_object = Value::empty_object();
-            eval_object(
-                env,
-                Value::as_object(get_key(object, "args").unwrap_or(&empty_object))?,
-            )
-        };
-
+    pub fn call(
+        &self,
+        env: &Arc<Environment>,
+        object: &Object,
+        args: &Arc<Value>,
+    ) -> Result<Arc<Value>, Error> {
         match &self.body {
             FunctionBody::Native(native) => {
-                let args = get_args()?;
-                native(Value::as_object(&args)?)
+                let evalated_args = eval(env, args)?;
+                native(&evalated_args)
             }
             FunctionBody::Lambda(lambda) => {
-                let args = get_args()?;
-                lambda.call(Value::as_object(&args)?)
+                let evalated_args = eval(env, args)?;
+                lambda.call(&evalated_args)
             }
-            FunctionBody::NativeSpecialForm(special_form) => special_form(env, object),
+            FunctionBody::NativeSpecialForm(special_form) => special_form(env, object, args),
         }
     }
 }
@@ -167,7 +168,7 @@ fn to_serde(value: &Arc<Value>) -> serde_json::Value {
 }
 
 pub fn parse(json: &str) -> Result<Arc<Value>, Error> {
-    let value: serde_json::Value = serde_json::from_str(json).map_err(|_| Error::Parse)?;
+    let value: serde_json::Value = serde_yaml::from_str(json).map_err(|_| Error::Parse)?;
     Ok(from_serde(value))
 }
 
@@ -193,7 +194,7 @@ impl Environment {
         env.bind_native_function("deserialize", builtins::deserialize);
         env.bind_native_function("serialize", builtins::serialize);
         env.bind_native_special_form("lambda", builtins::lambda);
-        env.bind_native_special_form("lookup", builtins::lookup);
+        env.bind_native_special_form("$", builtins::lookup);
         env.bind_native_special_form("quote", builtins::quote);
         Arc::new(env)
     }
@@ -228,38 +229,48 @@ impl Environment {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum Formals {
+    Singleton(String),
+    Positional(Vec<String>),
+    Named(Vec<String>),
+}
+
+#[derive(Debug, PartialEq, Eq)]
 struct Lambda {
     env: Arc<Environment>,
-    formals: Vec<String>,
+    formals: Formals,
     body: Arc<Value>,
 }
 
 impl Lambda {
-    pub fn call(&self, args: &Object) -> Result<Arc<Value>, Error> {
+    pub fn call(&self, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
         let mut variables = Map::new();
-        for name in &self.formals {
-            variables.insert(name.clone(), args[name].clone());
-        }
+        match &self.formals {
+            Formals::Singleton(name) => {
+                variables.insert(name.clone(), args.clone());
+            }
+            Formals::Positional(names) => {
+                let values = Value::as_array(args)?;
+                if names.len() != values.len() {
+                    return Err(Error::ArgumentCountMismatch(names.len(), values.len()));
+                }
+                for (name, actual) in names.iter().zip(values.iter()) {
+                    variables.insert(name.clone(), actual.clone());
+                }
+            }
+            Formals::Named(names) => {
+                let values = Value::as_object(args)?;
+                for name in names.iter() {
+                    variables.insert(name.clone(), values[name].clone());
+                }
+            }
+        };
         let env = Arc::new(Environment {
             variables,
             parent: Some(self.env.clone()),
         });
-        let result = eval(&env, &self.body)?;
-        Ok(result)
+        eval(&env, &self.body)
     }
-}
-
-fn eval_object(env: &Arc<Environment>, object: &Object) -> Result<Arc<Value>, Error> {
-    let evaluted_object = Object::from_iter(
-        object
-            .into_iter()
-            .map(|(key, value)| {
-                let value = eval(env, value)?;
-                Ok((key.clone(), value))
-            })
-            .collect::<Result<Vec<(String, Arc<Value>)>, Error>>()?,
-    );
-    Ok(Arc::new(Value::Object(evaluted_object)))
 }
 
 pub fn eval(env: &Arc<Environment>, value: &Arc<Value>) -> Result<Arc<Value>, Error> {
@@ -274,12 +285,9 @@ pub fn eval(env: &Arc<Environment>, value: &Arc<Value>) -> Result<Arc<Value>, Er
                 .collect::<Result<Vec<Arc<Value>>, Error>>()?,
         )),
         Value::Object(object) => {
-            let op = get_key(object, "op")?;
-            let func = match op.as_ref() {
-                Value::String(name) => env.lookup(&name)?.clone(),
-                _ => eval(env, op)?,
-            };
-            Value::as_function(&func)?.call(env, object)?
+            let op = get_op(object)?;
+            let func = env.lookup(&op.name)?.clone();
+            Value::as_function(&func)?.call(env, object, &op.args)?
         }
     })
 }
@@ -289,4 +297,32 @@ pub fn get_key<'a>(object: &'a Object, key: &str) -> Result<&'a Arc<Value>, Erro
         // let me break here
         Error::UnknownKey(key.to_string())
     })
+}
+
+struct Op {
+    name: String,
+    args: Arc<Value>,
+}
+
+fn get_op(object: &Object) -> Result<Op, Error> {
+    let ops: Vec<Op> = object
+        .iter()
+        .filter_map(|(key, value)| {
+            if key.len() == 1 || !key.starts_with("+") {
+                Some(Op {
+                    name: key.clone(),
+                    args: value.clone(),
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+    if ops.is_empty() {
+        return Err(Error::MissingOperation);
+    }
+    if ops.len() > 1 {
+        return Err(Error::AmbiguousOperation);
+    }
+    Ok(ops.into_iter().next().unwrap())
 }
