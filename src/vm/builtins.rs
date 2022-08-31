@@ -1,4 +1,6 @@
 use super::*;
+use std::fs;
+use std::path::Path;
 
 pub fn println(args: &Arc<Value>) -> Result<Arc<Value>, Error> {
     println!("{}", Value::as_string(args)?);
@@ -79,6 +81,41 @@ pub fn nonrecursive_let(
             Ok((name.clone(), value))
         })
         .collect::<Result<Object, Error>>()?;
+    let child_env = Arc::new(Environment {
+        variables: variables,
+        parent: Some(env.clone()),
+    });
+    eval(&child_env, get_key(object, "+in")?)
+}
+
+pub fn import(
+    env: &Arc<Environment>,
+    object: &Object,
+    args: &Arc<Value>,
+) -> Result<Arc<Value>, Error> {
+    let mut variables = Object::new();
+    let modules = Value::as_object(args)?;
+    let file_path = Path::new(Value::as_string(env.lookup(FILE_SYMBOL)?)?);
+    let file_dir = file_path.parent().unwrap();
+    for (name, _value) in modules.iter() {
+        let path_name = format!("{}.yapl", name);
+        let path = file_dir.join(path_name);
+        let program = fs::read_to_string(&path).map_err(|_| Error::IOError)?;
+        let parsed_program = parse(&program)?;
+        let root_env = Environment::builtin(path.display().to_string());
+        let exports = eval(&root_env, &parsed_program)?;
+        match exports.as_ref() {
+            Value::String(name) => {
+                variables.insert(name.clone(), exports);
+            }
+            Value::Null => {
+                for (name, value) in Value::as_object(&exports)?.iter() {
+                    variables.insert(name.clone(), value.clone());
+                }
+            }
+            _ => return Err(Error::TypeError),
+        };
+    }
     let child_env = Arc::new(Environment {
         variables: variables,
         parent: Some(env.clone()),

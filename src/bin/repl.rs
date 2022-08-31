@@ -12,7 +12,7 @@ fn read_eval_print(env: &Arc<vm::Environment>, input: &str) -> Result<String, vm
 
 fn main() -> rustyline::Result<()> {
     let mut rl = rustyline::Editor::<()>::new()?;
-    let env = vm::Environment::builtin();
+    let env = vm::Environment::builtin(".".to_string());
     loop {
         let readline = rl.readline(">> ");
         match readline {

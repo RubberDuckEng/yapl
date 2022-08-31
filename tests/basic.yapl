@@ -1,0 +1,18 @@
+#!target/debug/interp
+import:
+  goldentest:
++in:
+  tests:
+    # FIXME: We should be able to define tests as a macro and avoid this quote.
+    quote:
+      - in: hello
+        out: hello
+      # - in:
+      #     quote: { arbitrary: 1 }
+      #   out: { arbitrary: 1 }
+      # - in:
+      #     deserialize: '{ "banana": "fruit" }'
+      #   out: { banana: fruit }
+      # - in:
+      #     +: [1, 1]
+      #   out: 2

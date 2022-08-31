@@ -14,9 +14,10 @@ pub enum Error {
     AmbiguousOperation,
     TypeError,
     InvalidOperation,
-    UndefinedVariable(String),
+    UndefinedSymbol(String),
     UnknownKey(String),
     ArgumentCountMismatch(usize, usize),
+    IOError,
 }
 
 pub type Object = Map<String, Arc<Value>>;
@@ -178,6 +179,8 @@ pub fn serialize(value: &Arc<Value>) -> Result<String, Error> {
     serde_json::to_string(&value).map_err(|_| Error::Serializeation)
 }
 
+pub const FILE_SYMBOL: &str = "__file__";
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Environment {
     pub variables: Object,
@@ -185,15 +188,17 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn builtin() -> Arc<Environment> {
+    pub fn builtin(path: String) -> Arc<Environment> {
         let mut env = Environment {
             variables: Map::new(),
             parent: None,
         };
+        env.bind_string(FILE_SYMBOL, path);
         env.bind_native_function("deserialize", builtins::deserialize);
         env.bind_native_function("println", builtins::println);
         env.bind_native_function("serialize", builtins::serialize);
         env.bind_native_special_form("$", builtins::lookup);
+        env.bind_native_special_form("import", builtins::import);
         env.bind_native_special_form("lambda", builtins::lambda);
         env.bind_native_special_form("let", builtins::nonrecursive_let);
         env.bind_native_special_form("quote", builtins::quote);
@@ -206,8 +211,13 @@ impl Environment {
         } else if let Some(parent) = &self.parent {
             parent.lookup(name)
         } else {
-            Err(Error::UndefinedVariable(name.to_string()))
+            Err(Error::UndefinedSymbol(name.to_string()))
         }
+    }
+
+    pub fn bind_string(&mut self, name: &str, string: String) {
+        self.variables
+            .insert(name.to_string(), Arc::new(Value::String(string)));
     }
 
     pub fn bind_native_function(&mut self, name: &str, function: NativeFunction) {

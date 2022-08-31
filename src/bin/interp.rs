@@ -14,7 +14,7 @@ fn main() -> Result<()> {
     }
     let path = &args[1];
     let input = fs::read_to_string(path)?;
-    let env = vm::Environment::builtin();
+    let env = vm::Environment::builtin(path.to_string());
     match vm::parse(&input).and_then(|value| vm::eval(&env, &value)) {
         Ok(_) => Ok(()),
         Err(err) => {

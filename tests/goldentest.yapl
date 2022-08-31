@@ -1,0 +1,30 @@
+let:
+  test:
+    lambda: { in out }
+    +in:
+      let:
+        actual:
+          eval: { $: in }
+      if:
+        eq:
+          - { $: actual }
+          - { $: out }
+      +then:
+        println: PASS
+      +else:
+        - print: "FAIL: "
+        - print:
+            serialize: { $: in }
+        - print: " was "
+        - print:
+            serialize: { $: actual }
+        - print: " (expected: "
+        - print:
+            serialize: { $: out }
+        - println: ")"
++in:
+  export:
+    tests:
+      lambda: cases
+      +in:
+        map: [test cases]
