@@ -26,6 +26,7 @@ $ cargo run --bin interp examples/hello_world.json
 
 # Similar projects
 * [https://github.com/scravy/jinsi]
+* [https://github.com/benlue/jsonfp]
 * [https://stackoverflow.com/questions/1618038/xslt-equivalent-for-json]
 
 # Constructs that should be expressible
