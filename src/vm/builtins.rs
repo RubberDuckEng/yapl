@@ -40,7 +40,7 @@ pub fn lambda(
         body: FunctionBody::Lambda(Lambda {
             env: env.clone(),
             formals: get_formals(args)?,
-            body: get_key(object, "body")?.clone(),
+            body: get_key(object, "+in")?.clone(),
         }),
     }))))
 }
@@ -60,4 +60,28 @@ pub fn quote(
     args: &Arc<Value>,
 ) -> Result<Arc<Value>, Error> {
     Ok(args.clone())
+}
+
+// TODO: In this version of let, the values being bound to variables cannot see
+// themselves or other variables being bound. Eventually, we'll want letrec,
+// which will allow variables to see other variables, but involves a mutation
+// somewhere.
+pub fn nonrecursive_let(
+    env: &Arc<Environment>,
+    object: &Object,
+    args: &Arc<Value>,
+) -> Result<Arc<Value>, Error> {
+    let bindings = Value::as_object(args)?;
+    let variables: Object = bindings
+        .iter()
+        .map(|(name, value)| {
+            let value = eval(env, value)?;
+            Ok((name.clone(), value))
+        })
+        .collect::<Result<Object, Error>>()?;
+    let child_env = Arc::new(Environment {
+        variables: variables,
+        parent: Some(env.clone()),
+    });
+    eval(&child_env, get_key(object, "+in")?)
 }
