@@ -15,7 +15,7 @@ fn main() -> Result<()> {
     }
     let path = &args[1];
     let input = fs::read_to_string(path)?;
-    let value: serde_json::Value = serde_yaml::from_str(&input)?;
+    let value: serde_yaml::Value = serde_yaml::from_str(&input)?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }

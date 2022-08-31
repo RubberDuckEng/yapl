@@ -1,8 +1,0 @@
-[
-    {
-        "op": "println",
-        "args": {
-            "msg": "Hello, world!"
-        }
-    }
-]
