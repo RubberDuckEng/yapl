@@ -7,33 +7,32 @@ mod builtins;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    Parse,
-    Serializeation,
-    MissingOperation,
     AmbiguousOperation(Vec<Op>),
-    Type(String),
-    InvalidOperation,
+    ArgumentCountMismatch(usize, usize),
+    InvalidIndex(usize, usize),
+    InvalidNumber(Number),
+    InvalidOperation(String),
+    InvalidType(String),
+    IO,
+    MissingNamedArgument(String),
+    MissingOperation,
+    Parse,
+    Serialization,
     UndefinedSymbol(String),
     UnknownKey(String),
-    InvalidIndex(usize, usize),
-    ArgumentCountMismatch(usize, usize),
-    MissingNamedArgument(String),
-    InvalidNumber(Number),
-    IO,
 }
 
 impl Error {
-    fn new_type(expected: &str, actual: &Arc<Value>) -> Error {
-        Error::Type(format!("Expected {}, got {}", expected, actual.type_of()))
+    fn invalid_type(expected: &str, actual: &Arc<Value>) -> Error {
+        Error::InvalidType(format!("Expected {}, got {}", expected, actual.type_of()))
     }
 }
 
 pub type Object = Map<String, Arc<Value>>;
 pub type Map<K, V> = std::collections::HashMap<K, V>;
 pub type Number = serde_json::Number;
-pub type NativeFunction = fn(&Arc<Environment>, &Arc<Value>) -> Result<Arc<Value>, Error>;
-pub type NativeSpecialForm =
-    fn(&Arc<Environment>, &Object, &Arc<Value>) -> Result<Arc<Value>, Error>;
+pub type NativeFunction = fn(&Arc<Env>, &Arc<Value>) -> Result<Arc<Value>, Error>;
+pub type NativeSpecialForm = fn(&Arc<Env>, &Object, &Arc<Value>) -> Result<Arc<Value>, Error>;
 
 // TODO: Use a smarter handle than Arc to store null, bool, number, and string
 // without needing a heap allocation.
@@ -79,14 +78,14 @@ impl Value {
     pub fn as_bool(value: &Arc<Value>) -> Result<bool, Error> {
         match value.as_ref() {
             Value::Bool(value) => Ok(*value),
-            _ => Err(Error::new_type("bool", value)),
+            _ => Err(Error::invalid_type("bool", value)),
         }
     }
 
     pub fn as_number(value: &Arc<Value>) -> Result<Number, Error> {
         match value.as_ref() {
             Value::Number(value) => Ok(value.clone()),
-            _ => Err(Error::new_type("number", value)),
+            _ => Err(Error::invalid_type("number", value)),
         }
     }
 
@@ -98,28 +97,28 @@ impl Value {
     pub fn as_string(value: &Arc<Value>) -> Result<&str, Error> {
         match value.as_ref() {
             Value::String(value) => Ok(value),
-            _ => Err(Error::new_type("string", value)),
+            _ => Err(Error::invalid_type("string", value)),
         }
     }
 
     pub fn as_function(value: &Arc<Value>) -> Result<&Function, Error> {
         match value.as_ref() {
             Value::Function(value) => Ok(value),
-            _ => Err(Error::new_type("function", value)),
+            _ => Err(Error::invalid_type("function", value)),
         }
     }
 
     pub fn as_object(value: &Arc<Value>) -> Result<&Object, Error> {
         match value.as_ref() {
             Value::Object(value) => Ok(value),
-            _ => Err(Error::new_type("object", value)),
+            _ => Err(Error::invalid_type("object", value)),
         }
     }
 
     pub fn as_array(value: &Arc<Value>) -> Result<&Vec<Arc<Value>>, Error> {
         match value.as_ref() {
             Value::Array(values) => Ok(values),
-            _ => Err(Error::new_type("array", value)),
+            _ => Err(Error::invalid_type("array", value)),
         }
     }
 }
@@ -152,28 +151,31 @@ pub struct Function {
 }
 
 impl Function {
-    fn eval_args(&self, env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
-        match &self.body {
-            FunctionBody::Native(_) => {
-                // TODO: This isn't quite right. We need to be able to know whether
-                // the native function takes an object, an array, or a singleton value.
-                eval(env, args)
-            }
-            FunctionBody::Lambda(lambda) => lambda.eval_args(env, args),
-            FunctionBody::NativeSpecialForm(_) => Ok(args.clone()),
-        }
-    }
-
-    pub fn call(
+    fn eval(
         &self,
-        env: &Arc<Environment>,
+        env: &Arc<Env>,
         object: &Object,
         args: &Arc<Value>,
     ) -> Result<Arc<Value>, Error> {
         match &self.body {
+            FunctionBody::Native(native) => {
+                // TODO: This isn't quite right. We need to be able to know whether
+                // the native function takes an object, an array, or a singleton value.
+                let args = eval(env, args)?;
+                native(env, &args)
+            }
+            FunctionBody::Lambda(lambda) => lambda.eval(env, args),
+            FunctionBody::NativeSpecialForm(native) => native(env, object, args),
+        }
+    }
+
+    pub fn call(&self, env: &Arc<Env>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+        match &self.body {
             FunctionBody::Native(native) => native(env, args),
             FunctionBody::Lambda(lambda) => lambda.call(args),
-            FunctionBody::NativeSpecialForm(special_form) => special_form(env, object, args),
+            FunctionBody::NativeSpecialForm(_) => Err(Error::InvalidOperation(
+                "Cannot call special form".to_string(),
+            )),
         }
     }
 }
@@ -221,20 +223,20 @@ pub fn parse(json: &str) -> Result<Arc<Value>, Error> {
 pub fn serialize(value: &Arc<Value>) -> Result<String, Error> {
     // TODO: Avoid cloning the entire value just to serialize it.
     let value: serde_json::Value = to_serde(value);
-    serde_json::to_string(&value).map_err(|_| Error::Serializeation)
+    serde_json::to_string(&value).map_err(|_| Error::Serialization)
 }
 
 pub const FILE_SYMBOL: &str = "__file__";
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Environment {
+pub struct Env {
     pub variables: Object,
-    pub parent: Option<Arc<Environment>>,
+    pub parent: Option<Arc<Env>>,
 }
 
-impl Environment {
-    pub fn builtin(path: String) -> Arc<Environment> {
-        let mut env = Environment {
+impl Env {
+    pub fn builtin(path: String) -> Arc<Env> {
+        let mut env = Env {
             variables: Map::new(),
             parent: None,
         };
@@ -257,8 +259,8 @@ impl Environment {
         Arc::new(env)
     }
 
-    pub fn new(variables: Object, parent: Option<Arc<Environment>>) -> Arc<Environment> {
-        Arc::new(Environment { variables, parent })
+    pub fn new(variables: Object, parent: Option<Arc<Env>>) -> Arc<Env> {
+        Arc::new(Env { variables, parent })
     }
 
     pub fn lookup(&self, name: &str) -> Result<&Arc<Value>, Error> {
@@ -304,14 +306,14 @@ pub enum Formals {
 
 #[derive(Debug, PartialEq, Eq)]
 struct Lambda {
-    env: Arc<Environment>,
+    env: Arc<Env>,
     formals: Formals,
     body: Arc<Value>,
 }
 
 impl Lambda {
-    fn eval_args(&self, env: &Arc<Environment>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
-        Ok(match &self.formals {
+    fn eval(&self, env: &Arc<Env>, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
+        let args = match &self.formals {
             Formals::Singleton(_) => eval(env, args)?,
             Formals::Positional(_) => {
                 let array = Value::as_array(args)?;
@@ -321,7 +323,8 @@ impl Lambda {
                 let object = Value::as_object(args)?;
                 Arc::new(Value::Object(eval_object(env, object)?))
             }
-        })
+        };
+        self.call(&args)
     }
 
     fn call(&self, args: &Arc<Value>) -> Result<Arc<Value>, Error> {
@@ -350,22 +353,19 @@ impl Lambda {
                 }
             }
         };
-        let env = Environment::new(variables, Some(self.env.clone()));
+        let env = Env::new(variables, Some(self.env.clone()));
         eval(&env, &self.body)
     }
 }
 
-pub fn eval_array(
-    env: &Arc<Environment>,
-    array: &Vec<Arc<Value>>,
-) -> Result<Vec<Arc<Value>>, Error> {
+pub fn eval_array(env: &Arc<Env>, array: &Vec<Arc<Value>>) -> Result<Vec<Arc<Value>>, Error> {
     array
         .iter()
         .map(|value| eval(env, value))
         .collect::<Result<Vec<Arc<Value>>, Error>>()
 }
 
-pub fn eval_object(env: &Arc<Environment>, object: &Object) -> Result<Object, Error> {
+pub fn eval_object(env: &Arc<Env>, object: &Object) -> Result<Object, Error> {
     object
         .iter()
         .map(|(name, value)| {
@@ -375,7 +375,7 @@ pub fn eval_object(env: &Arc<Environment>, object: &Object) -> Result<Object, Er
         .collect::<Result<Object, Error>>()
 }
 
-pub fn eval(env: &Arc<Environment>, value: &Arc<Value>) -> Result<Arc<Value>, Error> {
+pub fn eval(env: &Arc<Env>, value: &Arc<Value>) -> Result<Arc<Value>, Error> {
     Ok(match value.as_ref() {
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Function(_) => {
             value.clone()
@@ -384,8 +384,7 @@ pub fn eval(env: &Arc<Environment>, value: &Arc<Value>) -> Result<Arc<Value>, Er
         Value::Object(object) => {
             let op = get_op(object)?;
             let func = Value::as_function(env.lookup(&op.name)?)?;
-            let args = func.eval_args(env, &op.args)?;
-            func.call(env, object, &args)?
+            func.eval(env, object, &op.args)?
         }
     })
 }

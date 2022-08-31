@@ -4,7 +4,7 @@ use jsonpl::vm;
 use rustyline;
 use std::sync::Arc;
 
-fn read_eval_print(env: &Arc<vm::Environment>, input: &str) -> Result<String, vm::Error> {
+fn read_eval_print(env: &Arc<vm::Env>, input: &str) -> Result<String, vm::Error> {
     let value = vm::parse(input)?;
     let value = vm::eval(env, &value)?;
     vm::serialize(&value)
@@ -12,7 +12,7 @@ fn read_eval_print(env: &Arc<vm::Environment>, input: &str) -> Result<String, vm
 
 fn main() -> rustyline::Result<()> {
     let mut rl = rustyline::Editor::<()>::new()?;
-    let env = vm::Environment::builtin(".".to_string());
+    let env = vm::Env::builtin(".".to_string());
     loop {
         let readline = rl.readline(">> ");
         match readline {
