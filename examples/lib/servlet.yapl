@@ -1,0 +1,41 @@
+import:
+  http_server: http
++in:
+  export:
+    routes:
+      macro: { env, object, args }
+      +in:
+        http.serve:
+          match: { $: method }
+          +cases:
+            GET:
+              let:
+                servlet: { $: "args[path]" }
+              +in:
+                if:
+                  is_null: { $: servlet }
+                +then:
+                  http.respond:
+                    status_code: 404
+                    body: Not found
+                +else:
+                  let:
+                    servlet_func:
+                      eval:
+                        merge:
+                          - quote:
+                              lambda: { method, path, params, headers }
+                          - +in: { $: servlet }
+                      +env: { $: env }
+                  +in:
+                    # Should 500 when servlet fails
+                    # Should return whole request from servlet
+                    # when not string return value.
+                    http.respond:
+                      status_code: 200
+                      body:
+                        servlet_func: request
+          +default:
+            http.respond:
+              status_code: 404
+              body: Not found

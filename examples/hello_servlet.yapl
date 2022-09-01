@@ -1,0 +1,19 @@
+#!/usr/bin/env cargo run --bin interp
+# A microservice that takes a GET request and replies
+# with "Hello, $name!" where /hello?name=World is the request.
+import:
+  lib/servlet: servlet
+  lib/cowsay: cowsay
++in:
+  servlet.routes:
+    /hello:
+      cowsay:
+        cat:
+          - "Hello, "
+          - { $: params.name }
+          - !
+    /bye:
+      cat:
+        - "Bye, "
+        - { $: params.name }
+        - !
