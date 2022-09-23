@@ -1,0 +1,15 @@
++lambda: { in, out }
+in:
+  +let:
+    actual:
+      +eval: $in
+  in:
+    +if:
+      +eq: [ $actual, $out ]
+    then:
+      result: PASS
+    else:
+      result: FAIL
+      input: $in
+      expected: $out
+      actual: $actual

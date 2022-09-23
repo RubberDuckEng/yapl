@@ -1,0 +1,2 @@
+lambda: input
++in: { $: input }
