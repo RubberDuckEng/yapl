@@ -11,9 +11,9 @@ import:
         cat:
           - "Hello, "
           - { $: params.name }
-          - !
+          - "!"
     /bye:
       cat:
         - "Bye, "
         - { $: params.name }
-        - !
+        - "!"
