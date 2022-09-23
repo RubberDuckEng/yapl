@@ -1,20 +1,23 @@
-# jsonpl
- The JSON Programming Language
+# yapl
+ Yet Another Programing Language
 
-Transforms JSON to JSON.
+Transforms JSON to JSON using YAML as syntax.
 
 # How to run
 
 ```sh
-$ cargo run --bin interp examples/hello_world.json
+$ cargo run --bin interp examples/hello_world.yapl
 ```
+
+# TODO
+* Fix + to be on the function key, not the non-function keys.
+* Finish making hello_servlet.yapl work.
 
 # Things to try
 * Immutable?
 * No classes
 
 # Programs to write
-* Golden tester
 * Some simple adventure game
 * JSON RPC server
 
